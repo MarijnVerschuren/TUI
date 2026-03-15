@@ -9,5 +9,6 @@ __all__ = [
 	"gradient_text",
 	"visible_len",
 	"ansi_safe_truncate",
-	"FG_RESET"
+	"rich_to_ansi",
+	"COL_RESET"
 ]
