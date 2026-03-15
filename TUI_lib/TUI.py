@@ -150,6 +150,9 @@ class TBox(Render_Object):
 		self.line_limit = line_limit
 		self.text = []
 		
+	
+	def pop_text(self) -> str:
+		return self.text.pop(0)
 		
 	def add_text(self, text: str) -> None:
 		self.text.insert(0, text)
@@ -265,4 +268,3 @@ class TUI(object):
 				self.render()
 				FB.swap()
 				
-	
