@@ -272,7 +272,8 @@ def rich_to_ansi(text: str):
 				else:
 					seq += parse_color(p)
 				i += 1
-			stack.append(seq)
+			if seq != "": stack.append(seq)
+			else: seq = f"[{tag}]"
 			out += seq
 		pos = end
 	out += text[pos:]
