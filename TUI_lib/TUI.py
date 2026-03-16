@@ -181,11 +181,19 @@ def gradient_text(text, start_rgb, end_rgb):
 	return out + COL_RESET
 
 
-def visible_len(text: str) -> int:
-	skip = 0
+def format_tabs(text: str) -> str:
+	skip = 0; out = []
 	for i, ch in enumerate(text):
-		if ch == '\t': skip += 3 - (i % 4) # tab char is already counted
-	return len(ANSI_RE.sub("", text)) + skip
+		if ch == '\t':
+			s = 3 - ((i+skip) % 4) # tab char is already counted
+			skip += s; out.extend([' '] * (s + 1))
+		else: out.append(ch)
+	return ''.join(out)
+	
+
+# if tabs are left in the following functions will not work!
+def visible_len(text: str) -> int:
+	return len(ANSI_RE.sub("", text))
 
 
 def ansi_safe_truncate(text: str, width: int):
@@ -314,7 +322,7 @@ class TBox(Render_Object):
 			lines = len(self.text)
 			for i, l in enumerate(range(y + 1, h)):
 				if i < lines:
-					t = self.text[i]
+					t = format_tabs(self.text[i])
 					tlen = visible_len(t)
 					t = ansi_safe_truncate(t, w-3)
 					FB.draw(x+1, l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}")
