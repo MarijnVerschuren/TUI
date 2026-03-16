@@ -4,15 +4,8 @@ from time import sleep
 from threading import Thread
 
 
-if __name__ == "__main__":
-	
-	txt = "[dark_orange] [0] IRQ return 0 0xf[/dark_orange]"
-	tx = rich_to_ansi(txt)
-	print(txt)
-	print(tx)
-	input()
-	
-	
+
+def UI_test():
 	color = (0xD9, 0xA3, 0x4C)
 	config = {
 		"grid": [3, 2],
@@ -42,7 +35,7 @@ if __name__ == "__main__":
 	i = 0
 	while t.is_alive():
 		code.add_text(
-			f"{rgb_fg(30, 120, 80)}[{i:04}] 0x0800{i:04x}  LDR R0, [R1]{FG_RESET}"
+			f"{rgb_fg(30, 120, 80)}[{i:04}] 0x0800{i:04x}  LDR R0, [R1] hshshshshshshshhshshshshshshfgisgsurifguisfguiss{COL_RESET}"
 		)
 		sleep(0.05)
 		
@@ -50,3 +43,17 @@ if __name__ == "__main__":
 			sleep(0.05)
 			
 		i += 1
+
+
+
+
+
+if __name__ == "__main__":
+	#text = "he\tllo world"
+	#print(text, len(text), visible_len(text))
+	#txt = f"{rgb_fg(15, 30, 45)}{rgb_fg(60, 75, 90)}{text}{COL_RESET}"
+	#print(txt, len(txt), visible_len(txt))
+	
+	
+	
+	UI_test()

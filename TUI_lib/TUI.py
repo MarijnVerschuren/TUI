@@ -15,127 +15,123 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 COL_RESET = "\033[0m"
 
-TAG_RE = re.compile(r"\[(/?)(.*?)\]")
-HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
-RGB_COLOR = re.compile(r"^rgb\((\d+),(\d+),(\d+)\)$")
-
-NAMED_COLORS = {
-    "black": (0,0,0),
-    "red": (128,0,0),
-    "green": (0,128,0),
-    "yellow": (128,128,0),
-    "blue": (0,0,128),
-    "magenta": (128,0,128),
-    "cyan": (0,128,128),
-    "white": (192,192,192),
-
-    "bright_black": (128,128,128),
-    "bright_red": (255,0,0),
-    "bright_green": (0,255,0),
-    "bright_yellow": (255,255,0),
-    "bright_blue": (0,0,255),
-    "bright_magenta": (255,0,255),
-    "bright_cyan": (0,255,255),
-    "bright_white": (255,255,255),
-    "navy_blue": (0,0,95),
-    "dark_blue": (0,0,135),
-    "blue3": (0,0,215),
-    "blue1": (0,0,255),
-    "dodger_blue3": (0,95,215),
-    "dodger_blue2": (0,95,255),
-    "dodger_blue1": (0,135,255),
-    "deep_sky_blue4": (0,95,175),
-    "deep_sky_blue3": (0,135,215),
-    "deep_sky_blue2": (0,175,215),
-    "deep_sky_blue1": (0,175,255),
-    "sky_blue2": (135,175,255),
-    "sky_blue1": (135,215,255),
-    "light_sky_blue3": (135,175,215),
-    "dark_green": (0,95,0),
-    "green4": (0,135,0),
-    "spring_green4": (0,135,95),
-    "spring_green3": (0,175,95),
-    "chartreuse2": (135,215,0),
-    "chartreuse1": (135,255,0),
-    "light_green": (135,255,135),
-    "pale_green3": (135,215,135),
-    "dark_sea_green": (135,175,135),
-    "dark_cyan": (0,175,135),
-    "light_sea_green": (0,175,175),
-    "aquamarine1": (135,255,215),
-    "dark_slate_gray1": (135,255,255),
-    "dark_slate_gray3": (135,215,215),
-    "red1": (255,0,0),
-    "deep_pink4": (175,0,95),
-    "deep_pink2": (255,0,95),
-    "deep_pink1": (255,0,175),
-    "hot_pink": (255,95,215),
-    "indian_red1": (255,95,135),
-    "pale_violet_red1": (255,135,175),
-    "light_coral": (255,135,135),
-    "purple": (175,0,255),
-    "dark_violet": (175,0,215),
-    "magenta1": (255,0,255),
-    "magenta2": (255,0,215),
-    "medium_violet_red": (175,0,135),
-    "medium_orchid1": (255,95,255),
-    "medium_orchid3": (175,95,175),
-    "orchid1": (255,135,255),
-    "orchid2": (255,135,215),
-    "plum1": (255,175,255),
-    "orange_red1": (255,95,0),
-    "dark_orange": (255,135,0),
-    "orange1": (255,175,0),
-    "gold1": (255,215,0),
-    "yellow1": (255,255,0),
-    "light_goldenrod1": (255,255,95),
-    "light_goldenrod2": (255,215,135),
-    "khaki1": (255,255,135),
-    "wheat1": (255,255,175),
-    "navajo_white1": (255,215,175),
-    "sandy_brown": (255,175,95),
-    "light_salmon1": (255,175,135),
-    "salmon1": (255,135,95),
-    "light_pink1": (255,175,175),
-    "pink1": (255,175,215),
-    "misty_rose1": (255,215,215),
-    "thistle1": (255,215,255),
-    "grey0": (0,0,0),
-    "grey3": (8,8,8),
-    "grey7": (18,18,18),
-    "grey11": (28,28,28),
-    "grey15": (38,38,38),
-    "grey19": (48,48,48),
-    "grey23": (58,58,58),
-    "grey27": (68,68,68),
-    "grey30": (78,78,78),
-    "grey35": (88,88,88),
-    "grey39": (98,98,98),
-    "grey42": (108,108,108),
-    "grey46": (118,118,118),
-    "grey50": (128,128,128),
-    "grey54": (138,138,138),
-    "grey58": (148,148,148),
-    "grey62": (158,158,158),
-    "grey66": (168,168,168),
-    "grey70": (178,178,178),
-    "grey74": (188,188,188),
-    "grey78": (198,198,198),
-    "grey82": (208,208,208),
-    "grey85": (218,218,218),
-    "grey89": (228,228,228),
-    "grey93": (238,238,238)
-}
-
-STYLE_CODES = {
-	"bold": "\033[1m",
-	"dim": "\033[2m",
-	"italic": "\033[3m",
-	"underline": "\033[4m",
-	"blink": "\033[5m",
-	"reverse": "\033[7m",
-	"strike": "\033[9m",
-}
+# NAMED_COLORS = {
+#     "black": (0,0,0),
+#     "red": (128,0,0),
+#     "green": (0,128,0),
+#     "yellow": (128,128,0),
+#     "blue": (0,0,128),
+#     "magenta": (128,0,128),
+#     "cyan": (0,128,128),
+#     "white": (192,192,192),
+#
+#     "bright_black": (128,128,128),
+#     "bright_red": (255,0,0),
+#     "bright_green": (0,255,0),
+#     "bright_yellow": (255,255,0),
+#     "bright_blue": (0,0,255),
+#     "bright_magenta": (255,0,255),
+#     "bright_cyan": (0,255,255),
+#     "bright_white": (255,255,255),
+#     "navy_blue": (0,0,95),
+#     "dark_blue": (0,0,135),
+#     "blue3": (0,0,215),
+#     "blue1": (0,0,255),
+#     "dodger_blue3": (0,95,215),
+#     "dodger_blue2": (0,95,255),
+#     "dodger_blue1": (0,135,255),
+#     "deep_sky_blue4": (0,95,175),
+#     "deep_sky_blue3": (0,135,215),
+#     "deep_sky_blue2": (0,175,215),
+#     "deep_sky_blue1": (0,175,255),
+#     "sky_blue2": (135,175,255),
+#     "sky_blue1": (135,215,255),
+#     "light_sky_blue3": (135,175,215),
+#     "dark_green": (0,95,0),
+#     "green4": (0,135,0),
+#     "spring_green4": (0,135,95),
+#     "spring_green3": (0,175,95),
+#     "chartreuse2": (135,215,0),
+#     "chartreuse1": (135,255,0),
+#     "light_green": (135,255,135),
+#     "pale_green3": (135,215,135),
+#     "dark_sea_green": (135,175,135),
+#     "dark_cyan": (0,175,135),
+#     "light_sea_green": (0,175,175),
+#     "aquamarine1": (135,255,215),
+#     "dark_slate_gray1": (135,255,255),
+#     "dark_slate_gray3": (135,215,215),
+#     "red1": (255,0,0),
+#     "deep_pink4": (175,0,95),
+#     "deep_pink2": (255,0,95),
+#     "deep_pink1": (255,0,175),
+#     "hot_pink": (255,95,215),
+#     "indian_red1": (255,95,135),
+#     "pale_violet_red1": (255,135,175),
+#     "light_coral": (255,135,135),
+#     "purple": (175,0,255),
+#     "dark_violet": (175,0,215),
+#     "magenta1": (255,0,255),
+#     "magenta2": (255,0,215),
+#     "medium_violet_red": (175,0,135),
+#     "medium_orchid1": (255,95,255),
+#     "medium_orchid3": (175,95,175),
+#     "orchid1": (255,135,255),
+#     "orchid2": (255,135,215),
+#     "plum1": (255,175,255),
+#     "orange_red1": (255,95,0),
+#     "dark_orange": (255,135,0),
+#     "orange1": (255,175,0),
+#     "gold1": (255,215,0),
+#     "yellow1": (255,255,0),
+#     "light_goldenrod1": (255,255,95),
+#     "light_goldenrod2": (255,215,135),
+#     "khaki1": (255,255,135),
+#     "wheat1": (255,255,175),
+#     "navajo_white1": (255,215,175),
+#     "sandy_brown": (255,175,95),
+#     "light_salmon1": (255,175,135),
+#     "salmon1": (255,135,95),
+#     "light_pink1": (255,175,175),
+#     "pink1": (255,175,215),
+#     "misty_rose1": (255,215,215),
+#     "thistle1": (255,215,255),
+#     "grey0": (0,0,0),
+#     "grey3": (8,8,8),
+#     "grey7": (18,18,18),
+#     "grey11": (28,28,28),
+#     "grey15": (38,38,38),
+#     "grey19": (48,48,48),
+#     "grey23": (58,58,58),
+#     "grey27": (68,68,68),
+#     "grey30": (78,78,78),
+#     "grey35": (88,88,88),
+#     "grey39": (98,98,98),
+#     "grey42": (108,108,108),
+#     "grey46": (118,118,118),
+#     "grey50": (128,128,128),
+#     "grey54": (138,138,138),
+#     "grey58": (148,148,148),
+#     "grey62": (158,158,158),
+#     "grey66": (168,168,168),
+#     "grey70": (178,178,178),
+#     "grey74": (188,188,188),
+#     "grey78": (198,198,198),
+#     "grey82": (208,208,208),
+#     "grey85": (218,218,218),
+#     "grey89": (228,228,228),
+#     "grey93": (238,238,238)
+# }
+#
+# STYLE_CODES = {
+# 	"bold": "\033[1m",
+# 	"dim": "\033[2m",
+# 	"italic": "\033[3m",
+# 	"underline": "\033[4m",
+# 	"blink": "\033[5m",
+# 	"reverse": "\033[7m",
+# 	"strike": "\033[9m",
+# }
 
 
 class Terminal:
@@ -186,7 +182,10 @@ def gradient_text(text, start_rgb, end_rgb):
 
 
 def visible_len(text: str) -> int:
-	return len(ANSI_RE.sub("", text))
+	skip = 0
+	for i, ch in enumerate(text):
+		if ch == '\t': skip += 3 - (i % 4) # tab char is already counted
+	return len(ANSI_RE.sub("", text)) + skip
 
 
 def ansi_safe_truncate(text: str, width: int):
@@ -207,78 +206,6 @@ def ansi_safe_truncate(text: str, width: int):
 		result += COL_RESET
 		
 	return result
-
-
-
-def parse_color(name: str):
-	name = name.strip().lower()
-	if HEX_COLOR.match(name):
-		r = int(name[1:3], 16)
-		g = int(name[3:5], 16)
-		b = int(name[5:7], 16)
-		return rgb_fg(r, g, b)
-	m = RGB_COLOR.match(name)
-	if m:
-		r, g, b = map(int, m.groups())
-		return rgb_fg(r, g, b)
-	if name in NAMED_COLORS:
-		r, g, b = NAMED_COLORS[name]
-		return rgb_fg(r, g, b)
-	return ""
-
-
-def parse_bg(name: str):
-	name = name.strip().lower()
-	if HEX_COLOR.match(name):
-		r = int(name[1:3], 16)
-		g = int(name[3:5], 16)
-		b = int(name[5:7], 16)
-		return rgb_bg(r, g, b)
-	m = RGB_COLOR.match(name)
-	if m:
-		r, g, b = map(int, m.groups())
-		return rgb_bg(r, g, b)
-	if name in NAMED_COLORS:
-		r, g, b = NAMED_COLORS[name]
-		return rgb_bg(r, g, b)
-	return ""
-
-
-def rich_to_ansi(text: str):
-	pos = 0; stack = []; out = ""
-	for m in TAG_RE.finditer(text):
-		start, end = m.span()
-		out += text[pos:start]
-		closing = m.group(1)
-		tag = m.group(2).strip()
-		if closing:
-			if stack:
-				stack.pop()
-			out += COL_RESET
-			for s in stack:
-				out += s
-		else:
-			seq = ""
-			parts = tag.split()
-			i = 0
-			while i < len(parts):
-				p = parts[i]
-				if p == "on" and i + 1 < len(parts):
-					seq += parse_bg(parts[i + 1])
-					i += 2
-					continue
-				if p in STYLE_CODES:
-					seq += STYLE_CODES[p]
-				else:
-					seq += parse_color(p)
-				i += 1
-			if seq != "": stack.append(seq)
-			else: seq = f"[{tag}]"
-			out += seq
-		pos = end
-	out += text[pos:]
-	out += COL_RESET
-	return out
 
 
 
@@ -389,8 +316,8 @@ class TBox(Render_Object):
 				if i < lines:
 					t = self.text[i]
 					tlen = visible_len(t)
-					# TODO: w-9 ??
-					FB.draw(x+1, l, f"{t[:w-3]}{(' ' * (max((w-9)-tlen, 0)))}")
+					t = ansi_safe_truncate(t, w-3)
+					FB.draw(x+1, l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}")
 				else: FB.draw(x+1, l, "" * (w-3))
 				
 
