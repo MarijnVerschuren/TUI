@@ -5,6 +5,14 @@ from threading import Thread
 
 
 if __name__ == "__main__":
+	
+	txt = "[dark_orange]IRQ return 0 0xf[/dark_orange]"
+	tx = rich_to_ansi(txt)
+	print(txt)
+	print(tx)
+	input()
+	
+	
 	color = (0xD9, 0xA3, 0x4C)
 	config = {
 		"grid": [3, 2],
