@@ -7,7 +7,6 @@ import re
 import time
 
 
-
 # ============================================================
 # terminal and color functions
 # ============================================================
@@ -225,16 +224,23 @@ class FrameBuffer:
 		self.front = {}
 		self.back = {}
 	
+	@property
+	def layers(self) -> int:
+		if not self.back: return 0
+		return max(self.back.keys()) + 1
 	
-	def draw(self, x, y, text):
-		self.back[(x, y)] = text
+	def draw(self, x: int, y: int, text: str, layer: int = 0) -> None:
+		if layer not in self.back: self.back[layer] = {}
+		self.back[layer][(x, y)] = text
 	
 	
 	def swap(self):
-		for pos, text in self.back.items():
-			if self.front.get(pos) != text:
-				x, y = pos
-				sys.stdout.write(f"\033[{y};{x}H{text}")
+		for i in range(self.layers):
+			if i not in self.back: continue
+			for pos, text in self.back[i].items():
+				if self.front.get(pos) != text:
+					x, y = pos
+					sys.stdout.write(f"\033[{y};{x}H{text}")
 		
 		sys.stdout.flush()
 		self.front = self.back
@@ -260,7 +266,7 @@ class Render_Object(object):
 		self.x = x; self.y = y
 		self.w = w; self.h = h
 
-	
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool: return False	# returns True if changes occurred
 	def get_grid_pos(self, grid_dimensions: list) -> tuple[int, int, int, int]:
 		x, w = grid_dimensions[0][self.x]
 		for i in range(1, self.w):
@@ -272,51 +278,78 @@ class Render_Object(object):
 
 
 
-class TBox(Render_Object):
+class Box(Render_Object):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str = "",
-			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF), line_limit: int = 500
+			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+			augments: list = None
 	) -> None:
-		super(TBox, self).__init__(x, y, w, h)
+		super(Box, self).__init__(x, y, w, h)
 		self.title = title
 		self.color = rgb_fg(*color)
+		self.augments = augments
 		self.current_dimensions = None
+	
+	def draw_border(self, layer: int = 0) -> None:
+		x, y, w, h = self.current_dimensions
+		if w < 4 or h < 3: return
+		
+		FB.draw(x, y, 					f"{self.color}╭─┐{self.title[: w - 4]}┌{'─' * (w - 5 - len(self.title[: w - 4]))}╮{COL_RESET}", layer)
+		FB.draw(x, y + h - 1, 			f"{self.color}╰{'─' * (w - 2)}╯{COL_RESET}", layer)
+		
+		# Side borders
+		for i in range(1, h - 1):
+			FB.draw(x, y + i, 			f"{self.color}│{COL_RESET}", layer)
+			FB.draw(x + w - 1, y + i,	f"{self.color}│{COL_RESET}", layer)
+		
+		# augmentations
+		if not self.augments: return
+		for dx, dy, ch in self.augments:
+			FB.draw(x + dx, y + dy,		f"{self.color}{ch}{COL_RESET}", layer)
+			
+	
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool:
+		x, y, w, h = self.get_grid_pos(grid_dimensions)
+		update = self.current_dimensions != (x, y, w, h) or force_update
+		if update:
+			self.current_dimensions = (x, y, w, h)
+			self.draw_border(layer)
+			print(flush=True)
+		return update
+		
+
+
+
+class TBox(Box):
+	def __init__(
+			self, x: int, y: int, w: int, h: int, title: str,
+			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+			augments: list = None, line_limit: int = 500
+	) -> None:
+		super(TBox, self).__init__(x, y, w, h, title, color, augments)
 		
 		self.update_text = False
 		self.line_limit = line_limit
 		self.text = []
 		
+	def __getitem__(self, index: int) -> str:
+		try: return self.text[index]
+		except IndexError: return ""
 	
-	def pop_text(self) -> str:
-		return self.text.pop(0)
+	def pop(self) -> str:
+		text = self.text.pop(0)
+		self.update_text = True
+		return text
 		
-	def add_text(self, text: str) -> None:
+	def add(self, text: str) -> None:
 		self.text.insert(0, text)
 		self.text = self.text[:self.line_limit]
 		self.update_text = True
 	
-	
-	def update_border(self) -> None:
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool:
+		if super(TBox, self).render(grid_dimensions, force_update, layer):
+			self.update_text = True  # if statement to prevent short-circuiting errors
 		x, y, w, h = self.current_dimensions
-		if w < 4 or h < 3: return
-		
-		FB.draw(x, y, 			f"{self.color}╭─┐{self.title[: w - 4]}┌{'─' * (w - 5 - len(self.title[: w - 4]))}╮{COL_RESET}")
-		FB.draw(x, y + h - 1, 	f"{self.color}╰{'─' * (w - 2)}╯{COL_RESET}")
-		
-		# Side borders
-		for i in range(1, h - 1):
-			FB.draw(x, y + i, 			f"{self.color}│{COL_RESET}")
-			FB.draw(x + w - 1, y + i, 	f"{self.color}│{COL_RESET}")
-	
-	
-	def render(self, grid_dimensions: list, force_update: bool = False) -> None:
-		x, y, w, h = self.get_grid_pos(grid_dimensions)
-		if self.current_dimensions != (x, y, w, h) or force_update:
-			self.current_dimensions = (x, y, w, h)
-			self.update_border()
-			self.update_text = True
-			print(flush=True)
-		
 		if self.update_text:
 			self.update_text = False
 			lines = len(self.text)
@@ -325,23 +358,48 @@ class TBox(Render_Object):
 					t = format_tabs(self.text[i])
 					tlen = visible_len(t)
 					t = ansi_safe_truncate(t, w-3)
-					FB.draw(x+1, l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}")
-				else: FB.draw(x+1, l, "" * (w-3))
-				
+					FB.draw(x+1, l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}", layer)
+				else: FB.draw(x+1, l, " " * (w-3), layer)
+		return self.update_text
+	
+
+
+class Prompt(Box):
+	def __init__(
+			self, x: int, y: int, w: int, h: int, title: str,
+			message: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+			augments: list = None
+	) -> None:
+		super(Prompt, self).__init__(x, y, w, h, title, color, augments)
+		self.message = message
+	
+	
+	def handle_key(self, key: str):
+		pass
+	
+	
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> None:
+		if super(Prompt, self).render(grid_dimensions, force_update, layer):
+			update = True  # if statement to prevent short-circuiting errors
+		pass
+		
+		
+		
 
 
 class TUI(object):
 	def __init__(self, grid: tuple[int, int], modules: dict = None) -> None:
 		self.running = False
 		
-		# TODO: improve child system
-		self.children = {}
-		self.objects = []	# unordered version of children (render objects)
+		self.children = {}	# contains objects created by modules
+		self.objects = []	# all render objects (children + prompts etc..)
+		self.active_prompt = None # TODO: multi prompt??????
 		
 		self.keybindings = {}
 		
 		self.current_size = None
 		self.grid_dimensions = None
+		self.force_update = False
 		
 		self.grid = grid
 		if modules: self.load_modules(modules)
@@ -361,6 +419,10 @@ class TUI(object):
 	
 	
 	def handle_key(self, key: str) -> None:
+		up = key.isupper(); key = key.lower()
+		if self.active_prompt:
+			self.active_prompt.handle_key(key)
+			if key == "\n": self.unprompt(self.active_prompt)
 		if key == "q": self.running = False
 		if key in self.keybindings:
 			self.keybindings[key]()
@@ -371,6 +433,23 @@ class TUI(object):
 	
 	def get_child(self, obj_type: str, title: str):
 		return self.children[obj_type][title]
+	
+	def force_refresh(self):
+		print("\033[2J", end="", flush=True)
+		self.force_update = True
+	
+	def prompt(self, x: int, y: int, w: int, h: int, title: str) -> Prompt:
+		prompt = Prompt(x, y, w, h, title, "test")
+		self.objects.append(prompt)
+		self.active_prompt = prompt
+		return prompt
+	
+	
+	def unprompt(self, prompt: Prompt) -> None:
+		if prompt != self.active_prompt: raise UserWarning("prompt was not active!")
+		self.active_prompt = None
+		self.objects.remove(prompt)
+		self.force_refresh()
 		
 	
 	def update_grid(self, size: list) -> None:
@@ -387,15 +466,16 @@ class TUI(object):
 		width, height = shutil.get_terminal_size()
 		
 		# update grid
-		force_update = False
 		if self.current_size != (width, height):
-			print("\033[2J", end="", flush=True)
+			self.force_refresh()
 			self.update_grid([width, height])
 			self.current_size = (width, height)
-			force_update = True
-			
+		
+		# TODO: prompt is overwritten in some situations_
 		for obj in self.objects:
-			obj.render(self.grid_dimensions, force_update)
+			obj.render(self.grid_dimensions, self.force_update)
+			
+		if self.force_update: self.force_update = False
 		
 	
 	def run(self):
