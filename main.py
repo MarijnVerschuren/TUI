@@ -1,3 +1,5 @@
+import time
+
 from TUI_lib import *
 
 from time import sleep
@@ -15,6 +17,7 @@ def rand_color():
 
 halted = False
 def UI_test():
+	global halted
 	color = (0xD9, 0xA3, 0x4C)
 	config = {
 		"grid": [3, 4],
@@ -30,6 +33,7 @@ def UI_test():
 	
 	tui = TUI(**config)
 	code = tui.get_child("tbox", "code")
+	stack = tui.get_child("tbox", "call_stack")
 
 	def test_keybind():
 		global halted
@@ -38,7 +42,14 @@ def UI_test():
 	def prompt_keybind():
 		prompt = TPrompt(1, 1, 1, 2, "Error", "A memory error occurred at instruction [1245]", "Tried to read from 0x0004021\nins: udhdhfhgy\n regs: .....", (0xFF, 0, 0))
 		tui.prompt(prompt)
-	
+		
+	def choice():
+		prompt = CPrompt(1, 1, 1, 2, "Error", "Continue", ["Yes", "No"], (0xA0, 0xA0, 0))
+		tui.prompt(prompt)
+		while not (out := prompt.eval()):
+			time.sleep(0.01)
+		return out
+		
 	tui.add_keybind(" ", test_keybind)
 	tui.add_keybind("p", prompt_keybind)
 	
@@ -51,6 +62,9 @@ def UI_test():
 			f"{rgb_fg(30, 120, 80)}[{i:04}] 0x0800{i:04x}  LDR R0, [R1] hshshshshshshshhshshshshshshfgisgsurifguisfguiss{COL_RESET}"
 		)
 		sleep(0.05)
+		
+		if not (i % 100):
+			stack.add(f"{rgb_fg(0xFF, 0, 0)}{choice()}{COL_RESET}")
 		
 		while halted:
 			sleep(0.05)

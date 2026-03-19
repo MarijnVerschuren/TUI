@@ -12,6 +12,6 @@ __all__ = [
 	"ansi_safe_truncate",
 	"COL_RESET",
 	"TBox",
-	"Prompt",
-	"TPrompt"
+	"TPrompt",
+	"CPrompt"
 ]

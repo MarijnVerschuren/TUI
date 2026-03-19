@@ -5,6 +5,7 @@ import select
 import shutil
 import re
 import time
+from typing import Literal
 
 
 # ============================================================
@@ -150,9 +151,13 @@ class Terminal:
 		print("\033[H", end="\033[2J")
 	
 	def get_key(self) -> bytes or str or None:
-		if select.select([sys.stdin], [], [], 0)[0]:
-			return sys.stdin.read(1)
-		return None
+		if not select.select([sys.stdin], [], [], 0)[0]:
+			return None
+		ch = sys.stdin.read(1)
+		if ch == "\n": return "enter"
+		if ch != "\x1b": return ch
+		arrow = sys.stdin.read(2)[1]
+		return {"A": "up", "B": "down", "C": "right", "D": "left"}[arrow]
 
 
 
@@ -213,6 +218,18 @@ def ansi_safe_truncate(text: str, width: int):
 		result += COL_RESET
 		
 	return result
+
+
+def ansi_safe_truncate_and_pad(text: str, pad_ch: str, width: int, pad_method: Literal["R", "L", "C"] = "R") -> str:
+	t = format_tabs(text)
+	tlen = visible_len(t)
+	t = ansi_safe_truncate(t, width)
+	if pad_method == "R":
+		return f"{t}{(pad_ch * (max(width-tlen, 0)))}"
+	if pad_method == "L":
+		return f"{(pad_ch * (max(width-tlen, 0)))}{t}"
+	pad_c = max(width-tlen, 0)
+	return f"{(pad_ch * (pad_c // 2))}{t}{(pad_ch * (pad_c // 2))}"
 
 
 
@@ -322,7 +339,7 @@ class TBox(Box):
 	) -> None:
 		super(TBox, self).__init__(x, y, w, h, title, color)
 		self.augments = augments or []
-		self.update_text = False
+		self.update = False
 		self.line_limit = line_limit
 		self.text = []
 		
@@ -332,29 +349,26 @@ class TBox(Box):
 	
 	def pop(self) -> str:
 		text = self.text.pop(0)
-		self.update_text = True
+		self.update = True
 		return text
 		
 	def add(self, text: str) -> None:
 		self.text.insert(0, text)
 		self.text = self.text[:self.line_limit]
-		self.update_text = True
+		self.update = True
 	
 	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool:
 		if super(TBox, self).render(grid_dimensions, force_update, layer):
-			self.update_text = True  # if statement to prevent short-circuiting errors
+			self.update = True  # if statement to prevent short-circuiting errors
+		if not self.update: return False
 		x, y, w, h = self.current_dimensions
-		if self.update_text:
-			self.update_text = False
-			lines = len(self.text)
-			for i, l in enumerate(range(1, h-1)):
-				if i < lines:
-					t = format_tabs(self.text[i])
-					tlen = visible_len(t)
-					t = ansi_safe_truncate(t, w-3) # TODO: make func
-					FB.draw(x+1, y+l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}", layer)
-				else: FB.draw(x+1, y+l, " " * (w-3), layer)
-		return self.update_text
+		self.update = False
+		lines = len(self.text)
+		for i, l in enumerate(range(1, h-1)):
+			if i < lines:
+				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(self.text[i], " ", w-2), layer)
+			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+		return True
 	
 
 
@@ -367,15 +381,18 @@ class Prompt(Box):
 		super(Prompt, self).__init__(x, y, w, h, title, color)
 		self.augments = augments or []
 		self.message = message
-	
-	
+		self.ended = False
+		
+	def end(self) -> None: self.ended = True
 	def handle_key(self, key: str) -> None: pass
+	
+	
 	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> bool:
 		if not super(Prompt, self).render(grid_dimensions, force_update, layer): return False
 		x, y, w, h = self.current_dimensions
-		l = len(self.message) # TODO: safe trunc + pad (use func)
-		FB.draw(x+(w//2)-(l//2), y+1, self.message, layer)
+		FB.draw(x+1, y+1, ansi_safe_truncate_and_pad(self.message, " ", w-2, "C"), layer)
 		FB.draw(x, y+2, f"{self.color}├{'─' * (w-2)}┤{COL_RESET}", layer+1)
+		FB.draw(x+w-21, y+h-2, f"{self.color}press enter to exit{COL_RESET}", layer+1)
 		return True
 	
 	
@@ -390,20 +407,49 @@ class TPrompt(Prompt):
 		self.text = text.splitlines()
 	
 	
-	def handle_key(self, key: str) -> None: pass
 	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> bool:
 		if not super(TPrompt, self).render(grid_dimensions, force_update, layer): return False
 		x, y, w, h = self.current_dimensions
 		lines = len(self.text)
 		for i, l in enumerate(range(3, h-1)):
 			if i < lines:
-				t = format_tabs(self.text[i])
-				tlen = visible_len(t)
-				t = ansi_safe_truncate(t, w-2) # TODO: make func
-				FB.draw(x+1, y+l, f"{t}{(' ' * (max((w-2)-tlen, 0)))}", layer)
+				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(self.text[i], " ", w-2), layer)
 			else: FB.draw(x+1, y+l, " " * (w-2), layer)
 		return True
+
+
+
+class CPrompt(Prompt):
+	def __init__(
+		self, x: int, y: int, w: int, h: int, title: str,
+		message: str, choices: list, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+		augments: list = None
+	 ) -> None:
+		super(CPrompt, self).__init__(x, y, w, h, title, message, color, augments)
+		self.choices = choices
+		self.choice_count = len(choices)
+		self.update = False
+		self.selected = 0
+	
+	
+	def eval(self) -> None or any: return self.choices[self.selected] if self.ended else None
+	
+	def handle_key(self, key: str) -> None:
+		if key == "up":		self.selected = max(0, self.selected - 1);						self.update = True
+		if key == "down":	self.selected = min(self.selected + 1, self.choice_count - 1);	self.update = True
 		
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> bool:
+		if super(CPrompt, self).render(grid_dimensions, force_update, layer):
+			self.update = True
+		if not self.update: return False
+		self.update = False
+		x, y, w, h = self.current_dimensions
+		for i, l in enumerate(range(3, h-2)):
+			if i < self.choice_count:
+				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(f"-{'>' if i == self.selected else ' '}[{i}]: {self.choices[i]}", " ", w-2), layer)
+			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+		return True
+
 		
 
 
@@ -439,10 +485,10 @@ class TUI(object):
 	
 	
 	def handle_key(self, key: str) -> None:
-		up = key.isupper(); key = key.lower()
+		key = key.lower()
 		if self.has_prompt:
 			self.active_prompt.handle_key(key)
-			if key == "\n": self.unprompt(self.active_prompt)
+			if key == "enter": self.unprompt(self.active_prompt)
 		if key == "q": self.running = False
 		if key in self.keybindings:
 			self.keybindings[key]()
@@ -472,6 +518,7 @@ class TUI(object):
 		if prompt not in self.prompts: raise UserWarning("prompt was not active!")
 		self.prompts.remove(prompt)
 		self.objects.remove(prompt)
+		prompt.end()
 		self.force_refresh()
 		
 	
