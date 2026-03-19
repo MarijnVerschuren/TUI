@@ -3,6 +3,15 @@ from TUI_lib import *
 from time import sleep
 from threading import Thread
 
+from random import randint
+
+from TUI_lib import *
+
+
+def rand_color():
+	return randint(0, 0xFF), randint(0, 0xFF), randint(0, 0xFF)
+
+
 
 halted = False
 def UI_test():
@@ -27,7 +36,8 @@ def UI_test():
 		halted = not halted
 		
 	def prompt_keybind():
-		tui.prompt(1,1,1,2, "test")
+		prompt = TPrompt(1, 1, 1, 2, "Error", "A memory error occurred at instruction [1245]", "Tried to read from 0x0004021\nins: udhdhfhgy\n regs: .....", (0xFF, 0, 0))
+		tui.prompt(prompt)
 	
 	tui.add_keybind(" ", test_keybind)
 	tui.add_keybind("p", prompt_keybind)

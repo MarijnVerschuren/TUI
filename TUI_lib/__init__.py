@@ -10,5 +10,8 @@ __all__ = [
 	"gradient_text",
 	"visible_len",
 	"ansi_safe_truncate",
-	"COL_RESET"
+	"COL_RESET",
+	"TBox",
+	"Prompt",
+	"TPrompt"
 ]

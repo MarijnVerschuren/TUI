@@ -147,7 +147,7 @@ class Terminal:
 	def __exit__(self, *args) -> None:
 		termios.tcsetattr(self.fd, termios.TCSADRAIN, self.attr)
 		print("\033[0m\033[?25h")   # reset + show cursor
-		print("\033[H", end="")
+		print("\033[H", end="\033[2J")
 	
 	def get_key(self) -> bytes or str or None:
 		if select.select([sys.stdin], [], [], 0)[0]:
@@ -281,13 +281,11 @@ class Render_Object(object):
 class Box(Render_Object):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str = "",
-			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-			augments: list = None
+			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
 	) -> None:
 		super(Box, self).__init__(x, y, w, h)
 		self.title = title
 		self.color = rgb_fg(*color)
-		self.augments = augments
 		self.current_dimensions = None
 	
 	def draw_border(self, layer: int = 0) -> None:
@@ -302,10 +300,6 @@ class Box(Render_Object):
 			FB.draw(x, y + i, 			f"{self.color}│{COL_RESET}", layer)
 			FB.draw(x + w - 1, y + i,	f"{self.color}│{COL_RESET}", layer)
 		
-		# augmentations
-		if not self.augments: return
-		for dx, dy, ch in self.augments:
-			FB.draw(x + dx, y + dy,		f"{self.color}{ch}{COL_RESET}", layer)
 			
 	
 	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool:
@@ -326,8 +320,8 @@ class TBox(Box):
 			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
 			augments: list = None, line_limit: int = 500
 	) -> None:
-		super(TBox, self).__init__(x, y, w, h, title, color, augments)
-		
+		super(TBox, self).__init__(x, y, w, h, title, color)
+		self.augments = augments or []
 		self.update_text = False
 		self.line_limit = line_limit
 		self.text = []
@@ -353,13 +347,13 @@ class TBox(Box):
 		if self.update_text:
 			self.update_text = False
 			lines = len(self.text)
-			for i, l in enumerate(range(y + 1, h)):
+			for i, l in enumerate(range(1, h-1)):
 				if i < lines:
 					t = format_tabs(self.text[i])
 					tlen = visible_len(t)
-					t = ansi_safe_truncate(t, w-3)
-					FB.draw(x+1, l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}", layer)
-				else: FB.draw(x+1, l, " " * (w-3), layer)
+					t = ansi_safe_truncate(t, w-3) # TODO: make func
+					FB.draw(x+1, y+l, f"{t}{(' ' * (max((w-3)-tlen, 0)))}", layer)
+				else: FB.draw(x+1, y+l, " " * (w-3), layer)
 		return self.update_text
 	
 
@@ -370,19 +364,45 @@ class Prompt(Box):
 			message: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
 			augments: list = None
 	) -> None:
-		super(Prompt, self).__init__(x, y, w, h, title, color, augments)
+		super(Prompt, self).__init__(x, y, w, h, title, color)
+		self.augments = augments or []
 		self.message = message
 	
 	
-	def handle_key(self, key: str):
-		pass
+	def handle_key(self, key: str) -> None: pass
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> bool:
+		if not super(Prompt, self).render(grid_dimensions, force_update, layer): return False
+		x, y, w, h = self.current_dimensions
+		l = len(self.message) # TODO: safe trunc + pad (use func)
+		FB.draw(x+(w//2)-(l//2), y+1, self.message, layer)
+		FB.draw(x, y+2, f"{self.color}├{'─' * (w-2)}┤{COL_RESET}", layer+1)
+		return True
 	
 	
-	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> None:
-		if super(Prompt, self).render(grid_dimensions, force_update, layer):
-			update = True  # if statement to prevent short-circuiting errors
-		pass
-		
+
+class TPrompt(Prompt):
+	def __init__(
+		self, x: int, y: int, w: int, h: int, title: str,
+		message: str, text: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+		augments: list = None
+	 ) -> None:
+		super(TPrompt, self).__init__(x, y, w, h, title, message, color, augments)
+		self.text = text.splitlines()
+	
+	
+	def handle_key(self, key: str) -> None: pass
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> bool:
+		if not super(TPrompt, self).render(grid_dimensions, force_update, layer): return False
+		x, y, w, h = self.current_dimensions
+		lines = len(self.text)
+		for i, l in enumerate(range(3, h-1)):
+			if i < lines:
+				t = format_tabs(self.text[i])
+				tlen = visible_len(t)
+				t = ansi_safe_truncate(t, w-2) # TODO: make func
+				FB.draw(x+1, y+l, f"{t}{(' ' * (max((w-2)-tlen, 0)))}", layer)
+			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+		return True
 		
 		
 
@@ -393,7 +413,7 @@ class TUI(object):
 		
 		self.children = {}	# contains objects created by modules
 		self.objects = []	# all render objects (children + prompts etc..)
-		self.active_prompt = None # TODO: multi prompt??????
+		self.prompts = []
 		
 		self.keybindings = {}
 		
@@ -420,7 +440,7 @@ class TUI(object):
 	
 	def handle_key(self, key: str) -> None:
 		up = key.isupper(); key = key.lower()
-		if self.active_prompt:
+		if self.has_prompt:
 			self.active_prompt.handle_key(key)
 			if key == "\n": self.unprompt(self.active_prompt)
 		if key == "q": self.running = False
@@ -438,16 +458,19 @@ class TUI(object):
 		print("\033[2J", end="", flush=True)
 		self.force_update = True
 	
-	def prompt(self, x: int, y: int, w: int, h: int, title: str) -> Prompt:
-		prompt = Prompt(x, y, w, h, title, "test")
+	@property
+	def active_prompt(self) -> Prompt: return self.prompts[-1]
+	@property
+	def has_prompt(self) -> bool: return len(self.prompts) > 0
+	
+	def prompt(self, prompt: Prompt) -> None:
 		self.objects.append(prompt)
-		self.active_prompt = prompt
-		return prompt
+		self.prompts.append(prompt)
 	
 	
 	def unprompt(self, prompt: Prompt) -> None:
-		if prompt != self.active_prompt: raise UserWarning("prompt was not active!")
-		self.active_prompt = None
+		if prompt not in self.prompts: raise UserWarning("prompt was not active!")
+		self.prompts.remove(prompt)
 		self.objects.remove(prompt)
 		self.force_refresh()
 		
