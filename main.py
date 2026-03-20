@@ -14,6 +14,21 @@ def rand_color():
 	return randint(0, 0xFF), randint(0, 0xFF), randint(0, 0xFF)
 
 
+class Regs(object):
+	def __init__(self) -> None:
+		self.regs = {
+			"R0": 0x40000000,
+			"R1": 0x40000200,
+			"PC": 0x80000400
+		}
+	
+	def __hash__(self) -> int: return hash(tuple(hash((r, d)) for r, d in self.regs.items()))
+	def __str__(self) -> str:
+		out = []
+		for reg, dat in self.regs.items():
+			out.append(f"{reg}: {rgb_fg(0x30, 0x60, 0xA0)}{hex(dat)}")
+		return "\n".join(out)
+
 
 halted = False
 def UI_test():
@@ -25,8 +40,10 @@ def UI_test():
 			"tbox": [
 				{"x": 0, "y": 0, "w": 1, "h": 4, "title": "code",		"color": color},
 				{"x": 1, "y": 0, "w": 1, "h": 2, "title": "call_stack",	"color": color},
-				{"x": 2, "y": 0, "w": 1, "h": 2, "title": "registers",	"color": color},
 				{"x": 1, "y": 2, "w": 2, "h": 2, "title": "hardware",	"color": color},
+			],
+			"obox": [
+				{"x": 2, "y": 0, "w": 1, "h": 2, "title": "registers",	"color": color},
 			]
 		}
 	}
@@ -34,6 +51,11 @@ def UI_test():
 	tui = TUI(**config)
 	code = tui.get_child("tbox", "code")
 	stack = tui.get_child("tbox", "call_stack")
+	regs = tui.get_child("obox", "registers")
+	
+	registers = Regs()
+	regs.set_obj(registers)
+	
 
 	def test_keybind():
 		global halted
@@ -64,7 +86,8 @@ def UI_test():
 		sleep(0.05)
 		
 		if not (i % 100):
-			stack.add(f"{rgb_fg(0xFF, 0, 0)}{choice()}{COL_RESET}")
+			registers.regs["R2"] = randint(0, 0xFFFFFFFF)
+			#stack.add(f"{rgb_fg(0xFF, 0, 0)}{choice()}{COL_RESET}")
 		
 		while halted:
 			sleep(0.05)

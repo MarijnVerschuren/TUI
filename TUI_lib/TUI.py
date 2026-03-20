@@ -1,277 +1,15 @@
-import sys
-import termios
-import tty
-import select
 import shutil
-import re
 import time
-from typing import Literal
 
 
-# ============================================================
-# terminal and color functions
-# ============================================================
-ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-
-COL_RESET = "\033[0m"
-
-# NAMED_COLORS = {
-#     "black": (0,0,0),
-#     "red": (128,0,0),
-#     "green": (0,128,0),
-#     "yellow": (128,128,0),
-#     "blue": (0,0,128),
-#     "magenta": (128,0,128),
-#     "cyan": (0,128,128),
-#     "white": (192,192,192),
-#
-#     "bright_black": (128,128,128),
-#     "bright_red": (255,0,0),
-#     "bright_green": (0,255,0),
-#     "bright_yellow": (255,255,0),
-#     "bright_blue": (0,0,255),
-#     "bright_magenta": (255,0,255),
-#     "bright_cyan": (0,255,255),
-#     "bright_white": (255,255,255),
-#     "navy_blue": (0,0,95),
-#     "dark_blue": (0,0,135),
-#     "blue3": (0,0,215),
-#     "blue1": (0,0,255),
-#     "dodger_blue3": (0,95,215),
-#     "dodger_blue2": (0,95,255),
-#     "dodger_blue1": (0,135,255),
-#     "deep_sky_blue4": (0,95,175),
-#     "deep_sky_blue3": (0,135,215),
-#     "deep_sky_blue2": (0,175,215),
-#     "deep_sky_blue1": (0,175,255),
-#     "sky_blue2": (135,175,255),
-#     "sky_blue1": (135,215,255),
-#     "light_sky_blue3": (135,175,215),
-#     "dark_green": (0,95,0),
-#     "green4": (0,135,0),
-#     "spring_green4": (0,135,95),
-#     "spring_green3": (0,175,95),
-#     "chartreuse2": (135,215,0),
-#     "chartreuse1": (135,255,0),
-#     "light_green": (135,255,135),
-#     "pale_green3": (135,215,135),
-#     "dark_sea_green": (135,175,135),
-#     "dark_cyan": (0,175,135),
-#     "light_sea_green": (0,175,175),
-#     "aquamarine1": (135,255,215),
-#     "dark_slate_gray1": (135,255,255),
-#     "dark_slate_gray3": (135,215,215),
-#     "red1": (255,0,0),
-#     "deep_pink4": (175,0,95),
-#     "deep_pink2": (255,0,95),
-#     "deep_pink1": (255,0,175),
-#     "hot_pink": (255,95,215),
-#     "indian_red1": (255,95,135),
-#     "pale_violet_red1": (255,135,175),
-#     "light_coral": (255,135,135),
-#     "purple": (175,0,255),
-#     "dark_violet": (175,0,215),
-#     "magenta1": (255,0,255),
-#     "magenta2": (255,0,215),
-#     "medium_violet_red": (175,0,135),
-#     "medium_orchid1": (255,95,255),
-#     "medium_orchid3": (175,95,175),
-#     "orchid1": (255,135,255),
-#     "orchid2": (255,135,215),
-#     "plum1": (255,175,255),
-#     "orange_red1": (255,95,0),
-#     "dark_orange": (255,135,0),
-#     "orange1": (255,175,0),
-#     "gold1": (255,215,0),
-#     "yellow1": (255,255,0),
-#     "light_goldenrod1": (255,255,95),
-#     "light_goldenrod2": (255,215,135),
-#     "khaki1": (255,255,135),
-#     "wheat1": (255,255,175),
-#     "navajo_white1": (255,215,175),
-#     "sandy_brown": (255,175,95),
-#     "light_salmon1": (255,175,135),
-#     "salmon1": (255,135,95),
-#     "light_pink1": (255,175,175),
-#     "pink1": (255,175,215),
-#     "misty_rose1": (255,215,215),
-#     "thistle1": (255,215,255),
-#     "grey0": (0,0,0),
-#     "grey3": (8,8,8),
-#     "grey7": (18,18,18),
-#     "grey11": (28,28,28),
-#     "grey15": (38,38,38),
-#     "grey19": (48,48,48),
-#     "grey23": (58,58,58),
-#     "grey27": (68,68,68),
-#     "grey30": (78,78,78),
-#     "grey35": (88,88,88),
-#     "grey39": (98,98,98),
-#     "grey42": (108,108,108),
-#     "grey46": (118,118,118),
-#     "grey50": (128,128,128),
-#     "grey54": (138,138,138),
-#     "grey58": (148,148,148),
-#     "grey62": (158,158,158),
-#     "grey66": (168,168,168),
-#     "grey70": (178,178,178),
-#     "grey74": (188,188,188),
-#     "grey78": (198,198,198),
-#     "grey82": (208,208,208),
-#     "grey85": (218,218,218),
-#     "grey89": (228,228,228),
-#     "grey93": (238,238,238)
-# }
-#
-# STYLE_CODES = {
-# 	"bold": "\033[1m",
-# 	"dim": "\033[2m",
-# 	"italic": "\033[3m",
-# 	"underline": "\033[4m",
-# 	"blink": "\033[5m",
-# 	"reverse": "\033[7m",
-# 	"strike": "\033[9m",
-# }
-
-
-class Terminal:
-	def __init__(self) -> None:
-		self.fd =   sys.stdin.fileno()
-		self.attr = termios.tcgetattr(self.fd)
-	
-	def __enter__(self) -> "Terminal":
-		tty.setcbreak(self.fd)
-		print("\033[?25l", end="")  # hide cursor
-		print("\033[2J", end="")	# clear once
-		return self
-	
-	def __exit__(self, *args) -> None:
-		termios.tcsetattr(self.fd, termios.TCSADRAIN, self.attr)
-		print("\033[0m\033[?25h")   # reset + show cursor
-		print("\033[H", end="\033[2J")
-	
-	def get_key(self) -> bytes or str or None:
-		if not select.select([sys.stdin], [], [], 0)[0]:
-			return None
-		ch = sys.stdin.read(1)
-		if ch == "\n": return "enter"
-		if ch != "\x1b": return ch
-		arrow = sys.stdin.read(2)[1]
-		return {"A": "up", "B": "down", "C": "right", "D": "left"}[arrow]
-
-
-
-def rgb_fg(r: int, g: int, b: int) -> str:
-	return f"\033[38;2;{r};{g};{b}m"
-
-
-def rgb_bg(r, g, b):
-	return f"\033[48;2;{r};{g};{b}m"
-
-
-def gradient_text(text, start_rgb, end_rgb):
-	sr, sg, sb = start_rgb
-	er, eg, eb = end_rgb
-	length = max(len(text) - 1, 1)
-	out = ""
-	
-	for i, ch in enumerate(text):
-		t = i / length
-		r = int(sr + (er - sr) * t)
-		g = int(sg + (eg - sg) * t)
-		b = int(sb + (eb - sb) * t)
-		out += f"\033[38;2;{r};{g};{b}m{ch}"
-	
-	return out + COL_RESET
-
-
-def format_tabs(text: str) -> str:
-	skip = 0; out = []
-	for i, ch in enumerate(text):
-		if ch == '\t':
-			s = 3 - ((i+skip) % 4) # tab char is already counted
-			skip += s; out.extend([' '] * (s + 1))
-		else: out.append(ch)
-	return ''.join(out)
-	
-
-# if tabs are left in the following functions will not work!
-def visible_len(text: str) -> int:
-	return len(ANSI_RE.sub("", text))
-
-
-def ansi_safe_truncate(text: str, width: int):
-	out = []; visible = 0; i = 0
-	while i < len(text) and visible < width:
-		if text[i] == "\033" and (m := ANSI_RE.match(text, i)):
-			seq = m.group(0)
-			out.append(seq)
-			i += len(seq)
-			continue
-			
-		out.append(text[i])
-		visible += 1
-		i += 1
-		
-	result = "".join(out)
-	if ANSI_RE.search(result) and not result.endswith(COL_RESET):
-		result += COL_RESET
-		
-	return result
-
-
-def ansi_safe_truncate_and_pad(text: str, pad_ch: str, width: int, pad_method: Literal["R", "L", "C"] = "R") -> str:
-	t = format_tabs(text)
-	tlen = visible_len(t)
-	t = ansi_safe_truncate(t, width)
-	if pad_method == "R":
-		return f"{t}{(pad_ch * (max(width-tlen, 0)))}"
-	if pad_method == "L":
-		return f"{(pad_ch * (max(width-tlen, 0)))}{t}"
-	pad_c = max(width-tlen, 0)
-	return f"{(pad_ch * (pad_c // 2))}{t}{(pad_ch * (pad_c // 2))}"
+from .base import *
 
 
 
 # ============================================================
-# frame buffer
+# frame buffer object
 # ============================================================
-class FrameBuffer:
-	def __init__(self):
-		self.front = {}
-		self.back = {}
-	
-	@property
-	def layers(self) -> int:
-		if not self.back: return 0
-		return max(self.back.keys()) + 1
-	
-	def draw(self, x: int, y: int, text: str, layer: int = 0) -> None:
-		if layer not in self.back: self.back[layer] = {}
-		self.back[layer][(x, y)] = text
-	
-	
-	def swap(self):
-		for i in range(self.layers):
-			if i not in self.back: continue
-			for pos, text in self.back[i].items():
-				if self.front.get(pos) != text:
-					x, y = pos
-					sys.stdout.write(f"\033[{y};{x}H{text}")
-		
-		sys.stdout.flush()
-		self.front = self.back
-		self.back = {}
-	
-	
-	def clear(self):
-		self.front = {}
-		self.back = {}
-		sys.stdout.write("\033[2J")
-		sys.stdout.flush()
-
-
-FB = FrameBuffer()
+FB = Frame_Buffer()
 
 
 
@@ -332,6 +70,10 @@ class Box(Render_Object):
 
 
 class TBox(Box):
+	""" Text Box
+	TUI box that displays text
+	TODO: add append order
+	"""
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str,
 			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
@@ -367,6 +109,50 @@ class TBox(Box):
 		for i, l in enumerate(range(1, h-1)):
 			if i < lines:
 				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(self.text[i], " ", w-2), layer)
+			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+		return True
+
+
+class OBox(Box):
+	""" Object Box
+	TUI box that displays an object.
+	object requirements:
+		- __str__ method
+		- __hash__ method (hashing printed data)
+	"""
+	def __init__(
+			self, x: int, y: int, w: int, h: int, title: str,
+			obj: any = None, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+			augments: list = None, line_limit: int = 500
+	) -> None:
+		super(OBox, self).__init__(x, y, w, h, title, color)
+		self.augments = augments or []
+		self.update = False
+		self.line_limit = line_limit
+		self.object = self.hash = None
+		if obj is not None: self.set_obj(obj)
+	
+	
+	def set_obj(self, obj: any) -> None:
+		if not hasattr(obj, "__str__"): raise TypeError(f"{type(obj)} has no __str__ method")
+		if not hasattr(obj, "__hash__"): raise TypeError(f"{type(obj)} has no __hash__ method")
+		self.object = obj
+		self.hash = hash(obj)
+	
+
+	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool:
+		if super(OBox, self).render(grid_dimensions, force_update, layer):
+			self.update = True  # if statement to prevent short-circuiting errors
+		if hash(self.object) != self.hash: self.update = True
+		if not self.update: return False
+		x, y, w, h = self.current_dimensions
+		self.hash = hash(self.object)
+		self.update = False
+		text =	str(self.object).split("\n")
+		lines =	len(text)
+		for i, l in enumerate(range(1, h-1)):
+			if i < lines:
+				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(f"{text[i]}", " ", w-2), layer)
 			else: FB.draw(x+1, y+l, " " * (w-2), layer)
 		return True
 	
@@ -471,16 +257,14 @@ class TUI(object):
 		if modules: self.load_modules(modules)
 		
 		
-	def load_modules(self, modules: dict):
-		if "tbox" in modules:
-			self.children.update({"tbox": {}})
-			for tbox in modules["tbox"]:
-				obj = TBox(**tbox)
+	def load_modules(self, modules: dict) -> None:
+		for obj_type, objs in modules.items():
+			self.children.update({obj_type: {}})
+			obj_t = {"tbox": TBox, "obox": OBox}[obj_type]
+			for kwargs in objs:
+				obj = obj_t(**kwargs)
 				self.objects.append(obj)
-				self.children["tbox"].update(
-					{tbox["title"]: obj}
-				)
-		# TODO: other objects?
+				self.children[obj_type].update({kwargs["title"]: obj})
 		# TODO: swappable objects??
 	
 	
@@ -497,7 +281,7 @@ class TUI(object):
 		self.keybindings.update({key: func})
 	
 	
-	def get_child(self, obj_type: str, title: str):
+	def get_child(self, obj_type: str, title: str) -> any:
 		return self.children[obj_type][title]
 	
 	def force_refresh(self):
