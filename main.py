@@ -38,12 +38,15 @@ def UI_test():
 		"grid": [3, 4],
 		"modules": {
 			"tbox": [
-				{"x": 0, "y": 0, "w": 1, "h": 4, "title": "code",		"color": color},
+				{"x": 0, "y": 0, "w": 1, "h": 4, "title": "code",		"color": color, "augments": [(0, 1, "❯")]},
 				{"x": 1, "y": 0, "w": 1, "h": 2, "title": "call_stack",	"color": color},
 				{"x": 1, "y": 2, "w": 2, "h": 2, "title": "hardware",	"color": color},
 			],
 			"obox": [
 				{"x": 2, "y": 0, "w": 1, "h": 2, "title": "registers",	"color": color},
+			],
+			"search": [
+				{"parent": "hardware", "x": 2, "y": 0, "key": "h", "title": "hardware_search", "color": color}, # TODO: create and link with parent
 			]
 		}
 	}

@@ -32,16 +32,27 @@ class Render_Object(object):
 		return x, y, w, h
 
 
+class Augment(object):
+	def __init__(self, parent: object, rel_x: int, rel_y: int) -> None:
+		self.parent = parent
+		self.x = rel_x; self.y = rel_y
+		
+	def render(self) -> bool: return False
+
+
 
 class Box(Render_Object):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str = "",
-			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
+			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
+			augments: list = None
 	) -> None:
 		super(Box, self).__init__(x, y, w, h)
 		self.title = title
 		self.color = rgb_fg(*color)
 		self.current_dimensions = None
+		self.augments = augments or []
+		
 	
 	def draw_border(self, layer: int = 0) -> None:
 		x, y, w, h = self.current_dimensions
@@ -54,6 +65,9 @@ class Box(Render_Object):
 		for i in range(1, h - 1):
 			FB.draw(x, y + i, 			f"{self.color}│{COL_RESET}", layer)
 			FB.draw(x + w - 1, y + i,	f"{self.color}│{COL_RESET}", layer)
+		
+		for x, y, aug in self.augments:
+			FB.draw(x, y, f"{self.color}{aug}{COL_RESET}", layer + 1)
 		
 			
 	
@@ -79,8 +93,7 @@ class TBox(Box):
 			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
 			augments: list = None, line_limit: int = 500
 	) -> None:
-		super(TBox, self).__init__(x, y, w, h, title, color)
-		self.augments = augments or []
+		super(TBox, self).__init__(x, y, w, h, title, color, augments)
 		self.update = False
 		self.line_limit = line_limit
 		self.text = []
@@ -123,13 +136,15 @@ class OBox(Box):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str,
 			obj: any = None, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-			augments: list = None, line_limit: int = 500
+			augments: list = None, line_limit: int = 500, search_box_key: str = None
 	) -> None:
-		super(OBox, self).__init__(x, y, w, h, title, color)
-		self.augments = augments or []
+		super(OBox, self).__init__(x, y, w, h, title, color, augments)
 		self.update = False
 		self.line_limit = line_limit
 		self.object = self.hash = None
+		self.search_box_key = search_box_key	# key used to activate search box
+		self.search_box_active = False
+		self.search_box_query = ""
 		if obj is not None: self.set_obj(obj)
 	
 	
@@ -138,6 +153,10 @@ class OBox(Box):
 		if not hasattr(obj, "__hash__"): raise TypeError(f"{type(obj)} has no __hash__ method")
 		self.object = obj
 		self.hash = hash(obj)
+		
+	
+	def handle_key(self, key: str) -> None:
+		pass
 	
 
 	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool:
@@ -164,11 +183,11 @@ class Prompt(Box):
 			message: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
 			augments: list = None
 	) -> None:
-		super(Prompt, self).__init__(x, y, w, h, title, color)
-		self.augments = augments or []
+		super(Prompt, self).__init__(x, y, w, h, title, color, augments)
 		self.message = message
 		self.ended = False
 		
+	def eval(self) -> bool: return self.ended
 	def end(self) -> None: self.ended = True
 	def handle_key(self, key: str) -> None: pass
 	
@@ -178,7 +197,7 @@ class Prompt(Box):
 		x, y, w, h = self.current_dimensions
 		FB.draw(x+1, y+1, ansi_safe_truncate_and_pad(self.message, " ", w-2, "C"), layer)
 		FB.draw(x, y+2, f"{self.color}├{'─' * (w-2)}┤{COL_RESET}", layer+1)
-		FB.draw(x+w-21, y+h-2, f"{self.color}press enter to exit{COL_RESET}", layer+1)
+		FB.draw(x+1, y+h-2, f"{' ' * (w-22)}{self.color}press enter to exit{COL_RESET}", layer+1)
 		return True
 	
 	
@@ -236,18 +255,50 @@ class CPrompt(Prompt):
 			else: FB.draw(x+1, y+l, " " * (w-2), layer)
 		return True
 
+	
+
+class SearchBox(Augment):
+	def __init__(self, parent: object, x: int, y: int) -> None:
+		super(SearchBox, self).__init__(parent, x, y)
+		self.active = False
 		
+	#def render(self) -> bool: return False
+
+
+class Keybind_Handler(object):
+	def __init__(self, tui: "TUI"):
+		self.tui = tui
+		self.keybindings = {}			# global keybinds
+		self.search_boxes = []
+		self.active_search_box = None	# TODO
+	
+	def add(self, key: dict[str: callable]):
+		self.keybindings.update(key)
+	
+	def handle_key(self, key: str) -> None:
+		key = key.lower()
+		if self.tui.has_prompt and key == "enter":
+			self.tui.unprompt(self.tui.active_prompt)
+		if key == "q": self.tui.running = False
+		if key in self.keybindings:
+			self.keybindings[key]()
+
+
 
 
 class TUI(object):
 	def __init__(self, grid: tuple[int, int], modules: dict = None) -> None:
 		self.running = False
 		
-		self.children = {}	# contains objects created by modules
-		self.objects = []	# all render objects (children + prompts etc..)
+		self.children = {}		# contains objects created by modules
+		self.objects = []		# all render objects (children + prompts etc..)
 		self.prompts = []
+		# TODO: add searchbox module that can be attached to objects (overtop?)
+		# TODO: keybinds should be managed from this class (link with title) sep class!
+		# TODO: improve key handling system?
+		self._log = []
 		
-		self.keybindings = {}
+		self.key_handler = Keybind_Handler(self)
 		
 		self.current_size = None
 		self.grid_dimensions = None
@@ -255,32 +306,36 @@ class TUI(object):
 		
 		self.grid = grid
 		if modules: self.load_modules(modules)
-		
-		
+	
+	def log(self, message: str) -> None: self._log.append(message)
+	
 	def load_modules(self, modules: dict) -> None:
 		for obj_type, objs in modules.items():
 			self.children.update({obj_type: {}})
+			if obj_type == "search":
+				for kwargs in objs:
+					parent = self.get_obj(kwargs["parent"])
+					# TODO
+				continue
 			obj_t = {"tbox": TBox, "obox": OBox}[obj_type]
 			for kwargs in objs:
 				obj = obj_t(**kwargs)
 				self.objects.append(obj)
 				self.children[obj_type].update({kwargs["title"]: obj})
 		# TODO: swappable objects??
-	
-	
-	def handle_key(self, key: str) -> None:
-		key = key.lower()
-		if self.has_prompt:
-			self.active_prompt.handle_key(key)
-			if key == "enter": self.unprompt(self.active_prompt)
-		if key == "q": self.running = False
-		if key in self.keybindings:
-			self.keybindings[key]()
+
 	
 	def add_keybind(self, key: str, func: callable) -> None:
-		self.keybindings.update({key: func})
+		self.key_handler.add({key: func})
 	
 	
+	def get_obj(self, title: str) -> any:
+		for obj in self.objects:
+			if obj.title != title:
+				return obj
+		return None
+	
+	# TODO: is the child set needed????
 	def get_child(self, obj_type: str, title: str) -> any:
 		return self.children[obj_type][title]
 	
@@ -337,8 +392,13 @@ class TUI(object):
 		with Terminal() as term:
 			while self.running:
 				key = term.get_key()
-				if key: self.handle_key(key)
+				if key: self.key_handler.handle_key(key)
 				self.render()
 				FB.swap()
 				time.sleep(0.01)
+		for log in self._log:
+			print(log)
 				
+				
+# TODO: log, render obj, augment obj (ref in parent obj and ref to parent obj, use hasattr to interact)
+
