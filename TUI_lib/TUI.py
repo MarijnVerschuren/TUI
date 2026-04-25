@@ -276,21 +276,20 @@ class Search_Augment(Augment):
 
 	def handle_key(self, key: str) -> "Search_Augment" or None:
 		if self.active:
-			if key == "enter": self.submit()
-			elif len(key) == 1:
-				self.search += key
+			if key == "enter":			self.submit()
+			elif key == "backspace":	self.search = self.search[:-1]
+			elif len(key) == 1:			self.search += key
 		elif key == self.key:
 			self.active = True
 		return self if self.active else None
 
 
 
-
+# TODO: refactor!!!
 class Keybind_Handler(object):
 	def __init__(self, tui: "TUI"):
 		self.tui = tui
 		self.keybindings = {}			# global keybinds
-		self.search_boxes = []
 		self.active_search_box = None
 	
 	def add(self, key: dict[str: callable]):
@@ -305,9 +304,15 @@ class Keybind_Handler(object):
 		if self.active_search_box:
 			self.active_search_box = self.active_search_box.handle_key(key)
 			self.tui.force_update = True
-		elif key in self.keybindings:
-			self.active_search_box = self.keybindings[key](key)
-		if self.active_search_box: self.tui.force_update = True
+		else:
+			if key in self.keybindings:
+				self.keybindings[key]()
+			for prompt in self.tui.prompts:
+				prompt.handle_key(key)
+			for aug in self.tui.augments:
+				self.active_search_box = aug.handle_key(key)
+				if self.active_search_box: self.tui.force_update = True
+			
 
 
 
@@ -351,8 +356,6 @@ class TUI(object):
 							aug = aug_t(parent=obj, **aug_kwargs)
 							obj.add_augment(aug)
 							self.augments.append(aug)
-							if aug_type == "search":
-								self.add_keybind(aug.key, aug.handle_key)
 				self.objects.append(obj)
 		# TODO: swappable objects??
 

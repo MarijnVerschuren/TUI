@@ -68,3 +68,4 @@ class Augment(Relative_Object):
 		self.parent = parent
 		
 	def render(self, x_offset: int, y_offset: int, layer: int = 0) -> bool: return False
+	def handle_key(self, key: str) -> any: pass

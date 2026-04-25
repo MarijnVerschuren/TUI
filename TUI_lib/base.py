@@ -48,8 +48,9 @@ class Terminal(object):
 		if not select.select([sys.stdin], [], [], 0)[0]:
 			return None
 		ch = sys.stdin.read(1)
-		if ch == "\n": return "enter"
-		if ch != "\x1b": return ch
+		if ch == "\n":				return "enter"
+		if ch in ("\x7f", "\x08"):	return "backspace"
+		if ch != "\x1b":			return ch
 		arrow = sys.stdin.read(2)[1]
 		return {"A": "up", "B": "down", "C": "right", "D": "left"}[arrow]
 	
