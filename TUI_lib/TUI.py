@@ -3,71 +3,40 @@ import time
 
 
 from .base import *
+from .objects import *
 
 
 
-# ============================================================
-# frame buffer object
-# ============================================================
-FB = Frame_Buffer()
-
-
-
-# ============================================================
-# UI objects
-# ============================================================
-class Render_Object(object):
-	def __init__(self, x: int, y: int, w: int, h: int) -> None:
-		self.x = x; self.y = y
-		self.w = w; self.h = h
-
-	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 0) -> bool: return False	# returns True if changes occurred
-	def get_grid_pos(self, grid_dimensions: list) -> tuple[int, int, int, int]:
-		x, w = grid_dimensions[0][self.x]
-		for i in range(1, self.w):
-			w += grid_dimensions[0][self.x + i][1]
-		y, h = grid_dimensions[1][self.y]
-		for i in range(1, self.h):
-			h += grid_dimensions[1][self.y + i][1]
-		return x, y, w, h
-
-
-class Augment(object):
-	def __init__(self, parent: object, rel_x: int, rel_y: int) -> None:
-		self.parent = parent
-		self.x = rel_x; self.y = rel_y
-		
-	def render(self) -> bool: return False
-
-
-
-class Box(Render_Object):
+class Box(Grid_Object):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str = "",
-			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-			augments: list = None
+			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
 	) -> None:
 		super(Box, self).__init__(x, y, w, h)
 		self.title = title
 		self.color = rgb_fg(*color)
 		self.current_dimensions = None
-		self.augments = augments or []
+		self.augments = []
+	
+	
+	def add_augment(self, aug: Augment) -> None:
+		self.augments.append(aug)
 		
 	
 	def draw_border(self, layer: int = 0) -> None:
 		x, y, w, h = self.current_dimensions
 		if w < 4 or h < 3: return
 		
-		FB.draw(x, y, 					f"{self.color}╭─┐{self.title[: w - 4]}┌{'─' * (w - 5 - len(self.title[: w - 4]))}╮{COL_RESET}", layer)
-		FB.draw(x, y + h - 1, 			f"{self.color}╰{'─' * (w - 2)}╯{COL_RESET}", layer)
+		self.draw(x, y, layer, 					f"{self.color}╭─┐{self.title[: w - 4]}┌{'─' * (w - 5 - len(self.title[: w - 4]))}╮{COL_RESET}")
+		self.draw(x, y + h - 1, layer, 			f"{self.color}╰{'─' * (w - 2)}╯{COL_RESET}")
 		
 		# Side borders
 		for i in range(1, h - 1):
-			FB.draw(x, y + i, 			f"{self.color}│{COL_RESET}", layer)
-			FB.draw(x + w - 1, y + i,	f"{self.color}│{COL_RESET}", layer)
+			self.draw(x, y + i, layer, 			f"{self.color}│{COL_RESET}")
+			self.draw(x + w - 1, y + i, layer,	f"{self.color}│{COL_RESET}")
 		
-		for x, y, aug in self.augments:
-			FB.draw(x, y, f"{self.color}{aug}{COL_RESET}", layer + 1)
+		for aug in self.augments:
+			aug.render(x, y, layer + 1)
 		
 			
 	
@@ -91,9 +60,9 @@ class TBox(Box):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str,
 			color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-			augments: list = None, line_limit: int = 500
+			line_limit: int = 500
 	) -> None:
-		super(TBox, self).__init__(x, y, w, h, title, color, augments)
+		super(TBox, self).__init__(x, y, w, h, title, color)
 		self.update = False
 		self.line_limit = line_limit
 		self.text = []
@@ -117,12 +86,13 @@ class TBox(Box):
 			self.update = True  # if statement to prevent short-circuiting errors
 		if not self.update: return False
 		x, y, w, h = self.current_dimensions
+		
 		self.update = False
 		lines = len(self.text)
 		for i, l in enumerate(range(1, h-1)):
 			if i < lines:
-				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(self.text[i], " ", w-2), layer)
-			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+				self.draw(x+1, y+l, layer, ansi_safe_truncate_and_pad(self.text[i], " ", w-2))
+			else: self.draw(x+1, y+l, layer, " " * (w-2))
 		return True
 
 
@@ -136,9 +106,9 @@ class OBox(Box):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str,
 			obj: any = None, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-			augments: list = None, line_limit: int = 500, search_box_key: str = None
+			line_limit: int = 500, search_box_key: str = None
 	) -> None:
-		super(OBox, self).__init__(x, y, w, h, title, color, augments)
+		super(OBox, self).__init__(x, y, w, h, title, color)
 		self.update = False
 		self.line_limit = line_limit
 		self.object = self.hash = None
@@ -154,6 +124,11 @@ class OBox(Box):
 		self.object = obj
 		self.hash = hash(obj)
 		
+		
+	def search(self, search: str) -> None:
+		if hasattr(self.object, "search"):
+			self.object.search(search)
+		print(f"OBOX_{self.title}.search({search})")
 	
 	def handle_key(self, key: str) -> None:
 		pass
@@ -165,14 +140,15 @@ class OBox(Box):
 		if hash(self.object) != self.hash: self.update = True
 		if not self.update: return False
 		x, y, w, h = self.current_dimensions
+		
 		self.hash = hash(self.object)
 		self.update = False
 		text =	str(self.object).split("\n")
 		lines =	len(text)
 		for i, l in enumerate(range(1, h-1)):
 			if i < lines:
-				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(f"{text[i]}", " ", w-2), layer)
-			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+				self.draw(x+1, y+l, layer, ansi_safe_truncate_and_pad(f"{text[i]}", " ", w-2))
+			else: self.draw(x+1, y+l, layer, " " * (w-2))
 		return True
 	
 
@@ -180,10 +156,9 @@ class OBox(Box):
 class Prompt(Box):
 	def __init__(
 			self, x: int, y: int, w: int, h: int, title: str,
-			message: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-			augments: list = None
+			message: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
 	) -> None:
-		super(Prompt, self).__init__(x, y, w, h, title, color, augments)
+		super(Prompt, self).__init__(x, y, w, h, title, color)
 		self.message = message
 		self.ended = False
 		
@@ -195,9 +170,9 @@ class Prompt(Box):
 	def render(self, grid_dimensions: list, force_update: bool = False, layer: int = 1) -> bool:
 		if not super(Prompt, self).render(grid_dimensions, force_update, layer): return False
 		x, y, w, h = self.current_dimensions
-		FB.draw(x+1, y+1, ansi_safe_truncate_and_pad(self.message, " ", w-2, "C"), layer)
-		FB.draw(x, y+2, f"{self.color}├{'─' * (w-2)}┤{COL_RESET}", layer+1)
-		FB.draw(x+1, y+h-2, f"{' ' * (w-22)}{self.color}press enter to exit{COL_RESET}", layer+1)
+		self.draw(x+1, y+1, layer,		ansi_safe_truncate_and_pad(self.message, " ", w-2, "C"))
+		self.draw(x, y+2, layer+1,		f"{self.color}├{'─' * (w-2)}┤{COL_RESET}")
+		self.draw(x+1, y+h-2, layer+1,	f"{' ' * (w-22)}{self.color}press enter to exit{COL_RESET}")
 		return True
 	
 	
@@ -205,10 +180,9 @@ class Prompt(Box):
 class TPrompt(Prompt):
 	def __init__(
 		self, x: int, y: int, w: int, h: int, title: str,
-		message: str, text: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-		augments: list = None
+		message: str, text: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
 	 ) -> None:
-		super(TPrompt, self).__init__(x, y, w, h, title, message, color, augments)
+		super(TPrompt, self).__init__(x, y, w, h, title, message, color)
 		self.text = text.splitlines()
 	
 	
@@ -218,8 +192,8 @@ class TPrompt(Prompt):
 		lines = len(self.text)
 		for i, l in enumerate(range(3, h-1)):
 			if i < lines:
-				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(self.text[i], " ", w-2), layer)
-			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+				self.draw(x+1, y+l, layer, ansi_safe_truncate_and_pad(self.text[i], " ", w-2))
+			else: self.draw(x+1, y+l, layer, " " * (w-2))
 		return True
 
 
@@ -227,10 +201,9 @@ class TPrompt(Prompt):
 class CPrompt(Prompt):
 	def __init__(
 		self, x: int, y: int, w: int, h: int, title: str,
-		message: str, choices: list, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF),
-		augments: list = None
+		message: str, choices: list, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
 	 ) -> None:
-		super(CPrompt, self).__init__(x, y, w, h, title, message, color, augments)
+		super(CPrompt, self).__init__(x, y, w, h, title, message, color)
 		self.choices = choices
 		self.choice_count = len(choices)
 		self.update = False
@@ -251,18 +224,66 @@ class CPrompt(Prompt):
 		x, y, w, h = self.current_dimensions
 		for i, l in enumerate(range(3, h-2)):
 			if i < self.choice_count:
-				FB.draw(x+1, y+l, ansi_safe_truncate_and_pad(f"-{'>' if i == self.selected else ' '}[{i}]: {self.choices[i]}", " ", w-2), layer)
-			else: FB.draw(x+1, y+l, " " * (w-2), layer)
+				self.draw(x+1, y+l, layer, ansi_safe_truncate_and_pad(f"-{'>' if i == self.selected else ' '}[{i}]: {self.choices[i]}", " ", w-2))
+			else: self.draw(x+1, y+l, layer, " " * (w-2))
 		return True
 
 	
+	
+# TODO: create augments
+class Text_Augment(Augment):
+	def __init__(self, parent: Box, x: int, y: int, text: str, color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)) -> None:
+		super(Text_Augment, self).__init__(parent, x, y)
+		self.text = text
+		self.color = rgb_fg(*color)
+		
+	def render(self, x_offset: int, y_offset: int, layer: int = 0) -> bool:
+		self.draw(x_offset + self.x, y_offset + self.y, layer, f"{self.color}{self.text}{COL_RESET}")
+		return True
 
-class SearchBox(Augment):
-	def __init__(self, parent: object, x: int, y: int) -> None:
-		super(SearchBox, self).__init__(parent, x, y)
+
+class Search_Augment(Augment):
+	def __init__(
+		self, parent: Box, x: int, y: int, title: str, key: str,
+		color: tuple[int, int, int] = (0xFF, 0xFF, 0xFF)
+	) -> None:
+		super(Search_Augment, self).__init__(parent, x, y)
+		self.title = title
+		self.key = key
+		self.color = rgb_fg(*color)
+		if self.key in self.title:
+			self.title_text = self.title.replace(
+				self.key, f"{BOLD + UNDERLINE}{self.key}{BOLD_OFF + UNDERLINE_OFF}"
+			)
+		else: self.title_text = f"{BOLD}{self.key}{BOLD_OFF}: {self.title}"
+		self.active = False
+		self.search = ""
+		
+	def render(self, x_offset: int, y_offset: int, layer: int = 0) -> bool:
+		if self.active:
+			text = f"{self.color}┐{self.search}┌{COL_RESET}"
+		else:
+			text = f"{self.color}┐{self.title_text}┌{COL_RESET}"
+		self.draw(x_offset + self.x, y_offset + self.y, layer, text)
+		return True
+
+	def submit(self):
+		if hasattr(self.parent, "search"):
+			self.parent.search(self.search)
+		self.search = ""
 		self.active = False
 		
-	#def render(self) -> bool: return False
+
+	def handle_key(self, key: str) -> "Search_Augment" or None:
+		if self.active:
+			if key == "enter": self.submit()
+			elif len(key) == 1:
+				self.search += key
+		elif key == self.key:
+			self.active = True
+		return self if self.active else None
+
+
 
 
 class Keybind_Handler(object):
@@ -270,18 +291,23 @@ class Keybind_Handler(object):
 		self.tui = tui
 		self.keybindings = {}			# global keybinds
 		self.search_boxes = []
-		self.active_search_box = None	# TODO
+		self.active_search_box = None
 	
 	def add(self, key: dict[str: callable]):
 		self.keybindings.update(key)
 	
-	def handle_key(self, key: str) -> None:
+	def handle_key(self, key: str or None) -> None:
+		if not key: return
 		key = key.lower()
 		if self.tui.has_prompt and key == "enter":
 			self.tui.unprompt(self.tui.active_prompt)
 		if key == "q": self.tui.running = False
-		if key in self.keybindings:
-			self.keybindings[key]()
+		if self.active_search_box:
+			self.active_search_box = self.active_search_box.handle_key(key)
+			self.tui.force_update = True
+		elif key in self.keybindings:
+			self.active_search_box = self.keybindings[key](key)
+		if self.active_search_box: self.tui.force_update = True
 
 
 
@@ -290,9 +316,10 @@ class TUI(object):
 	def __init__(self, grid: tuple[int, int], modules: dict = None) -> None:
 		self.running = False
 		
-		self.children = {}		# contains objects created by modules
 		self.objects = []		# all render objects (children + prompts etc..)
 		self.prompts = []
+		self.augments = []
+		
 		# TODO: add searchbox module that can be attached to objects (overtop?)
 		# TODO: keybinds should be managed from this class (link with title) sep class!
 		# TODO: improve key handling system?
@@ -311,33 +338,33 @@ class TUI(object):
 	
 	def load_modules(self, modules: dict) -> None:
 		for obj_type, objs in modules.items():
-			self.children.update({obj_type: {}})
-			if obj_type == "search":
-				for kwargs in objs:
-					parent = self.get_obj(kwargs["parent"])
-					# TODO
-				continue
 			obj_t = {"tbox": TBox, "obox": OBox}[obj_type]
 			for kwargs in objs:
+				augments = kwargs.get("augments", None)
+				if "augments" in kwargs: del kwargs["augments"]
+				print(kwargs)
 				obj = obj_t(**kwargs)
+				if augments is not None:
+					for aug_type, augs in augments.items():
+						aug_t = {"text": Text_Augment, "search": Search_Augment}[aug_type]
+						for aug_kwargs in augs:
+							aug = aug_t(parent=obj, **aug_kwargs)
+							obj.add_augment(aug)
+							self.augments.append(aug)
+							if aug_type == "search":
+								self.add_keybind(aug.key, aug.handle_key)
 				self.objects.append(obj)
-				self.children[obj_type].update({kwargs["title"]: obj})
 		# TODO: swappable objects??
 
 	
 	def add_keybind(self, key: str, func: callable) -> None:
 		self.key_handler.add({key: func})
 	
-	
-	def get_obj(self, title: str) -> any:
+	def get_child(self, title: str) -> any:
 		for obj in self.objects:
-			if obj.title != title:
+			if obj.title == title:
 				return obj
 		return None
-	
-	# TODO: is the child set needed????
-	def get_child(self, obj_type: str, title: str) -> any:
-		return self.children[obj_type][title]
 	
 	def force_refresh(self):
 		print("\033[2J", end="", flush=True)
@@ -381,6 +408,7 @@ class TUI(object):
 			self.current_size = (width, height)
 		
 		# TODO: prompt is overwritten in some situations_
+		# TODO: grid dimensions should be checked by obj itself?
 		for obj in self.objects:
 			obj.render(self.grid_dimensions, self.force_update)
 			
@@ -391,10 +419,9 @@ class TUI(object):
 		self.running = True
 		with Terminal() as term:
 			while self.running:
-				key = term.get_key()
-				if key: self.key_handler.handle_key(key)
+				self.key_handler.handle_key(term.get_key())
 				self.render()
-				FB.swap()
+				FB.swap()		# TODO: improve how this is referenced
 				time.sleep(0.01)
 		for log in self._log:
 			print(log)

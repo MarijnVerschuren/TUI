@@ -8,6 +8,10 @@ from typing import Literal
 
 
 __all__ = [
+	"BOLD",
+	"BOLD_OFF",
+	"UNDERLINE",
+	"UNDERLINE_OFF",
 	"COL_RESET",
 	"Terminal",
 	"Frame_Buffer",
@@ -94,8 +98,11 @@ class Frame_Buffer:
 # color functions
 # ============================================================
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
-COL_RESET = "\033[0m"
-
+COL_RESET =	"\033[0m"
+BOLD =		"\033[1m"
+BOLD_OFF =	"\033[22m"
+UNDERLINE = "\033[4m"
+UNDERLINE_OFF = "\033[24m"
 
 def rgb_fg(r: int, g: int, b: int) -> str:
 	return f"\033[38;2;{r};{g};{b}m"

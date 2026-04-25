@@ -35,26 +35,31 @@ def UI_test():
 	global halted
 	color = (0xD9, 0xA3, 0x4C)
 	config = {
-		"grid": [3, 4],
+		"grid": [6, 4],
 		"modules": {
 			"tbox": [
-				{"x": 0, "y": 0, "w": 1, "h": 4, "title": "code",		"color": color, "augments": [(0, 1, "❯")]},
-				{"x": 1, "y": 0, "w": 1, "h": 2, "title": "call_stack",	"color": color},
-				{"x": 1, "y": 2, "w": 2, "h": 2, "title": "hardware",	"color": color},
+				{"x": 0, "y": 0, "w": 2, "h": 4, "title": "code",		"color": color, "augments": {
+					"text": [{"x": 0, "y": 1, "text": "❯", "color": color}]
+				}},
+				{"x": 2, "y": 0, "w": 1, "h": 2, "title": "call_stack",	"color": color, "augments": {
+					"text": [{"x": 0, "y": 1, "text": "❯", "color": color}]
+				}},
+				{"x": 2, "y": 2, "w": 4, "h": 2, "title": "hardware",	"color": color},
 			],
 			"obox": [
-				{"x": 2, "y": 0, "w": 1, "h": 2, "title": "registers",	"color": color},
-			],
-			"search": [
-				{"parent": "hardware", "x": 2, "y": 0, "key": "h", "title": "hardware_search", "color": color}, # TODO: create and link with parent
+				{"x": 3, "y": 0, "w": 1, "h": 2, "title": "registers",	"color": color},
+				{"x": 4, "y": 0, "w": 2, "h": 2, "title": "memory",		"color": color, "augments": {
+					"text": [{"x": 0, "y": 1, "text": "❯", "color": color}],
+					"search": [{"x": 12, "y": 0, "title": "address", "key": "a", "color": color}]
+				}}
 			]
 		}
 	}
 	
 	tui = TUI(**config)
-	code = tui.get_child("tbox", "code")
-	stack = tui.get_child("tbox", "call_stack")
-	regs = tui.get_child("obox", "registers")
+	code = tui.get_child("code")
+	stack = tui.get_child("call_stack")
+	regs = tui.get_child("registers")
 	
 	registers = Regs()
 	regs.set_obj(registers)
